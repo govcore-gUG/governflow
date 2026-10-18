@@ -17,15 +17,33 @@ it('serves the application shell on the start page', function () {
         ->assertSee('<div id="app"></div>', false);
 });
 
-it('includes the frontend entry points in the application shell', function () {
-    $hotFile = tempnam(sys_get_temp_dir(), 'vite-hot');
-    file_put_contents($hotFile, 'http://vite.test');
-    Vite::useHotFile($hotFile);
+it('serves the application shell on any other page', function () {
+    withoutVite();
 
-    get('/')
+    get('/einstellungen/profil')
         ->assertOk()
-        ->assertSee('http://vite.test/resources/js/main.tsx', false)
-        ->assertSee('http://vite.test/resources/css/app.css', false);
+        ->assertSee('<div id="app"></div>', false);
+});
 
-    unlink($hotFile);
+it('does not serve the application shell for unknown API routes', function () {
+    get('/api/unbekannt')->assertNotFound();
+});
+
+it('includes the frontend entry points in the application shell', function () {
+    $hotFile = (string) tempnam(sys_get_temp_dir(), 'vite-hot');
+
+    // finally: the temporary file is removed even if an assertion fails.
+    try {
+        file_put_contents($hotFile, 'http://vite.test');
+        Vite::useHotFile($hotFile);
+
+        get('/')
+            ->assertOk()
+            ->assertSee('http://vite.test/resources/js/main.tsx', false)
+            ->assertSee('http://vite.test/resources/css/app.css', false);
+    } finally {
+        if (is_file($hotFile)) {
+            unlink($hotFile);
+        }
+    }
 });
