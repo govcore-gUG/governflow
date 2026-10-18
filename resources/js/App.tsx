@@ -1,3 +1,5 @@
+import AuthStatus from './components/AuthStatus';
+
 export default function App() {
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -6,7 +8,9 @@ export default function App() {
                     <h1 className="text-lg font-semibold">governflow</h1>
                 </div>
             </header>
-            <main className="mx-auto max-w-5xl px-4 py-6" />
+            <main className="mx-auto max-w-5xl px-4 py-6">
+                <AuthStatus />
+            </main>
         </div>
     );
 }
