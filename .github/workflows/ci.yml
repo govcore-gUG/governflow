@@ -40,11 +40,11 @@ jobs:
       DB_USERNAME: app
       DB_PASSWORD: testing
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - id: projekt
         run: echo "vorhanden=$([ -f composer.json ] && echo ja || echo nein)" >> "$GITHUB_OUTPUT"
       - if: steps.projekt.outputs.vorhanden == 'ja'
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: "8.5"
           extensions: bcmath, intl, pcntl, pdo_pgsql, pgsql, zip
@@ -69,11 +69,11 @@ jobs:
     name: Frontend
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - id: projekt
         run: echo "vorhanden=$([ -f package.json ] && echo ja || echo nein)" >> "$GITHUB_OUTPUT"
       - if: steps.projekt.outputs.vorhanden == 'ja'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "24"
           cache: npm
@@ -98,7 +98,7 @@ jobs:
     container:
       image: semgrep/semgrep:1.179.0
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - name: Statische Sicherheitsanalyse (PHP, TypeScript, Geheimnisse)
         run: >
           semgrep scan --metrics=off
@@ -106,7 +106,7 @@ jobs:
           --config p/owasp-top-ten --config p/secrets
           --sarif --output semgrep.sarif --error
       - if: always() && hashFiles('semgrep.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: semgrep.sarif
           category: semgrep
@@ -115,7 +115,7 @@ jobs:
     name: Geheimnisse
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
       - name: Keine Zugangsdaten im Repo (gitleaks, gesamte Historie)
@@ -127,7 +127,7 @@ jobs:
     name: Image-Scan
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - id: projekt
         run: echo "vorhanden=$([ -f Dockerfile ] && echo ja || echo nein)" >> "$GITHUB_OUTPUT"
       - if: steps.projekt.outputs.vorhanden == 'ja'
@@ -135,7 +135,7 @@ jobs:
         run: docker build -t app:ci .
       - if: steps.projekt.outputs.vorhanden == 'ja'
         name: Trivy (hohe und kritische Schwachstellen)
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: app:ci
           severity: HIGH,CRITICAL
