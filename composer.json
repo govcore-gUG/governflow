@@ -3,6 +3,7 @@
     "name": "govcore-gug/governflow",
     "type": "project",
     "description": "GovernFlow application.",
+    "license": "EUPL-1.2",
     "require": {
         "php": "^8.5",
         "laravel/framework": "^13.17",
