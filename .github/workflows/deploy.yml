@@ -1,0 +1,38 @@
+name: Deploy
+
+# main          -> Umgebung "staging"     (automatisch nach jedem Merge)
+# Tag v1.2.3    -> Umgebung "production"  (Tag setzt nur Lars; Freigabe in der Umgebung)
+#
+# Coolify deployt über seine API. Je Umgebung zwei Secrets (Settings > Environments):
+#   COOLIFY_DEPLOY_URL  https://<coolify>/api/v1/deploy?uuid=<ressourcen-uuid>
+#   COOLIFY_TOKEN       API-Token aus Coolify (Keys & Tokens), nur Recht "deploy"
+# Solange die Secrets fehlen, meldet der Job nur einen Hinweis.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'staging' }}
+    runs-on: ubuntu-24.04
+    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'staging' }}
+    steps:
+      - name: Coolify-Deployment auslösen
+        env:
+          COOLIFY_DEPLOY_URL: ${{ secrets.COOLIFY_DEPLOY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        run: |
+          if [ -z "${COOLIFY_DEPLOY_URL}" ] || [ -z "${COOLIFY_TOKEN}" ]; then
+            echo "::notice::Coolify-Secrets fehlen in dieser Umgebung, kein Deployment."
+            exit 0
+          fi
+          curl -fsS --max-time 60 -H "Authorization: Bearer ${COOLIFY_TOKEN}" "${COOLIFY_DEPLOY_URL}"

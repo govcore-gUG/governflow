@@ -1,0 +1,145 @@
+name: CI
+
+# Pflichtprüfungen für jeden Pull Request (Ruleset "Grundschutz").
+# Die Job-Namen sind die Namen der Pflicht-Checks und dürfen sich nicht ändern.
+# Solange das Projekt noch kein composer.json bzw. package.json hat, melden
+# Backend und Frontend "erfolgreich übersprungen".
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: app_test
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: testing
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U app -d app_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: app_test
+      DB_USERNAME: app
+      DB_PASSWORD: testing
+    steps:
+      - uses: actions/checkout@v6
+      - id: projekt
+        run: echo "vorhanden=$([ -f composer.json ] && echo ja || echo nein)" >> "$GITHUB_OUTPUT"
+      - if: steps.projekt.outputs.vorhanden == 'ja'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.5"
+          extensions: bcmath, intl, pcntl, pdo_pgsql, pgsql, zip
+          coverage: pcov
+          tools: composer:v2
+      - if: steps.projekt.outputs.vorhanden == 'ja'
+        name: Abhängigkeiten
+        run: composer install --no-interaction --no-progress --prefer-dist
+      - if: steps.projekt.outputs.vorhanden == 'ja'
+        name: Bekannte Schwachstellen (composer audit)
+        run: composer audit
+      - if: steps.projekt.outputs.vorhanden == 'ja'
+        name: Pint, Larastan, Pest (composer check)
+        run: |
+          cp -n .env.example .env || true
+          php artisan key:generate --force
+          composer check
+      - if: steps.projekt.outputs.vorhanden != 'ja'
+        run: echo "Noch kein composer.json, Backend-Prüfungen übersprungen."
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - id: projekt
+        run: echo "vorhanden=$([ -f package.json ] && echo ja || echo nein)" >> "$GITHUB_OUTPUT"
+      - if: steps.projekt.outputs.vorhanden == 'ja'
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - if: steps.projekt.outputs.vorhanden == 'ja'
+        name: Abhängigkeiten
+        run: npm ci
+      - if: steps.projekt.outputs.vorhanden == 'ja'
+        name: Bekannte Schwachstellen (npm audit)
+        run: npm audit --audit-level=high
+      - if: steps.projekt.outputs.vorhanden == 'ja'
+        name: ESLint, TypeScript, Vitest, Build (npm run check)
+        run: npm run check
+      - if: steps.projekt.outputs.vorhanden != 'ja'
+        run: echo "Noch kein package.json, Frontend-Prüfungen übersprungen."
+
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: semgrep/semgrep:1.179.0
+    steps:
+      - uses: actions/checkout@v6
+      - name: Statische Sicherheitsanalyse (PHP, TypeScript, Geheimnisse)
+        run: >
+          semgrep scan --metrics=off
+          --config p/php --config p/typescript --config p/react
+          --config p/owasp-top-ten --config p/secrets
+          --sarif --output semgrep.sarif --error
+      - if: always() && hashFiles('semgrep.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  geheimnisse:
+    name: Geheimnisse
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Keine Zugangsdaten im Repo (gitleaks, gesamte Historie)
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.28.0 \
+            git /repo --redact --no-banner
+
+  image:
+    name: Image-Scan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - id: projekt
+        run: echo "vorhanden=$([ -f Dockerfile ] && echo ja || echo nein)" >> "$GITHUB_OUTPUT"
+      - if: steps.projekt.outputs.vorhanden == 'ja'
+        name: Image bauen
+        run: docker build -t app:ci .
+      - if: steps.projekt.outputs.vorhanden == 'ja'
+        name: Trivy (hohe und kritische Schwachstellen)
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: app:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - if: steps.projekt.outputs.vorhanden != 'ja'
+        run: echo "Noch kein Dockerfile, Image-Scan übersprungen."

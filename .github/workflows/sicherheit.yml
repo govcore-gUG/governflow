@@ -1,0 +1,56 @@
+name: Sicherheit
+
+# CodeQL (TypeScript/JavaScript und die Workflows selbst) und Dependency Review.
+# Für PHP gibt es kein CodeQL; das übernimmt Semgrep in der CI.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  abhaengigkeiten:
+    name: Abhängigkeiten
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Neue Abhängigkeiten mit bekannten Schwachstellen ablehnen
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  codeql:
+    name: CodeQL (${{ matrix.sprache }})
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        sprache: [actions, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v6
+      - id: projekt
+        run: |
+          if [ "${{ matrix.sprache }}" = "javascript-typescript" ] && [ ! -f package.json ]; then
+            echo "aktiv=nein" >> "$GITHUB_OUTPUT"
+          else
+            echo "aktiv=ja" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.projekt.outputs.aktiv == 'ja'
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.sprache }}
+          queries: security-extended
+      - if: steps.projekt.outputs.aktiv == 'ja'
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.sprache }}

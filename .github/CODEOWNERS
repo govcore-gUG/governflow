@@ -1,0 +1,15 @@
+# Änderungen an diesen Pfaden brauchen die Freigabe von Lars (Ruleset "Grundschutz",
+# ohne Ausnahme auch für den Teamleiter-Bot). Alles andere darf der Teamleiter
+# nach grüner CI und Freigabe des Reviewers mergen.
+
+/.github/                     @thielecke
+/app/Http/Middleware/         @thielecke
+/app/Policies/                @thielecke
+/config/                      @thielecke
+/database/migrations/         @thielecke
+/composer.json                @thielecke
+/composer.lock                @thielecke
+/package.json                 @thielecke
+/package-lock.json            @thielecke
+/Dockerfile                   @thielecke
+/renovate.json                @thielecke
